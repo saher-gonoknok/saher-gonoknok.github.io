@@ -1,0 +1,34 @@
+:root {
+  --background: #ffffff;
+  --foreground: #181818;
+  --primary: #009bdc;
+  --primary-foreground: #ffffff;
+  --secondary: #e5f4fc;
+  --secondary-foreground: #181818;
+  --muted: #f3f3f3;
+  --muted-foreground: #808080;
+  --card: #ffffff;
+  --card-foreground: #181818;
+  --accent: #e5f4fc;
+  --accent-foreground: #009bdc;
+  --border: #e5e5e5;
+  --ring: #009bdc;
+  --radius: 0.75rem;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --font-sans: "Roboto", Arial, sans-serif;
+}

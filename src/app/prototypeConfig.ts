@@ -1,0 +1,55 @@
+// OWNER CONFIGURATION ONLY. These URLs are not editable by prototype users.
+export const PROTOTYPE_CONFIG = {
+  video: {
+    // Paste the public video URL for the HOME camera frame and PORTRAIT player here.
+    // Prefer a direct MP4 URL or a local asset such as "/assets/home-video.mp4".
+    // Public Google Drive /file/d/FILE_ID/view links use Drive's embedded player.
+    // Set sharing to "Anyone with the link". Drive controls playback and buffering.
+    // Direct MP4/local URLs use the native, autoplaying camera player instead.
+    homeVideoUrl: "https://drive.google.com/file/d/1pb-ro8NLyBpWEbsco2c9BVtpfgjkj7La/view?usp=drive_link",
+    // Paste the public LANDSCAPE video URL here. It plays when the phone is tilted.
+    // Leave empty to reuse homeVideoUrl without restarting playback on rotation.
+    landscapeVideoUrl: "",
+    // Keep H.264 MP4 files around 720p, 24–30 fps, with audio AAC and fast-start enabled.
+    // For reliable demos, place both videos in public/assets and use local URLs.
+    posterUrl: "/assets/camera-poster.png",
+  },
+  // Only the owner changes the schedule here. The Schedule Unlock screen is read-only.
+  schedule: {
+    enabled: true,
+    hour: 10,
+    minute: 15,
+    repeat: "CUSTOM" as "NEVER" | "DAILY" | "WEEKDAYS" | "WEEKENDS" | "CUSTOM",
+    days: [5, 6],
+  },
+}
+
+export function resolveVideoUrl(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  try {
+    const url = new URL(trimmed)
+    if (url.hostname === "drive.google.com") {
+      const fileId =
+        url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] ||
+        url.searchParams.get("id")
+      if (fileId)
+        return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`
+    }
+  } catch {
+    return trimmed
+  }
+  return trimmed
+}
+
+export function isDriveVideoUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return (
+      url.hostname === "drive.google.com" &&
+      /^\/file\/d\/[^/]+\/preview$/.test(url.pathname)
+    )
+  } catch {
+    return false
+  }
+}

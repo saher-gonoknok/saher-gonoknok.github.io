@@ -1,0 +1,15 @@
+@import './styles/fonts.css';
+@import 'tailwindcss';
+@import './styles/theme.css';
+
+@layer base {
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+  body { font-family: var(--font-sans); background: #eff1f3; }
+  button, a, select, input { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), select { cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #007cb8; outline-offset: 3px; }
+}
+@theme {
+  --animate-notification: notification 0.25s ease-out;
+  @keyframes notification { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
+}
