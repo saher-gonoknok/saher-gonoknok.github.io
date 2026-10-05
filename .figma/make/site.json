@@ -1,0 +1,11 @@
+{
+  "title": "GO NOKNOK",
+  "description": "Transform screenshots into a fully interactive prototype, enabling designers to demonstrate user flows and interactions without static limitations.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
