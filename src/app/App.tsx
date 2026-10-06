@@ -37,7 +37,6 @@ import {
   Siren,
   Smartphone,
   Truck,
-  Pause,
   UserPlus,
   Video,
   Volume2,
@@ -353,6 +352,83 @@ function SharedUserCard({
   )
 }
 
+function TimeWheel({
+  value,
+  max,
+  label,
+  onChange,
+}: {
+  value: number
+  max: number
+  label: string
+  onChange: (value: number) => void
+}) {
+  const touchStart = useRef<number | null>(null)
+  const wrap = (next: number) => (next + max) % max
+
+  return (
+    <div
+      role="spinbutton"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max - 1}
+      aria-valuenow={value}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+          event.preventDefault()
+          onChange(wrap(value + 1))
+        } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+          event.preventDefault()
+          onChange(wrap(value - 1))
+        }
+      }}
+      onWheel={(event) => {
+        event.preventDefault()
+        onChange(wrap(value + (event.deltaY > 0 ? 1 : -1)))
+      }}
+      onTouchStart={(event) => {
+        touchStart.current = event.touches[0]?.clientY ?? null
+      }}
+      onTouchEnd={(event) => {
+        const start = touchStart.current
+        const end = event.changedTouches[0]?.clientY
+        touchStart.current = null
+        if (start === null || end === undefined) return
+        const distance = start - end
+        if (Math.abs(distance) < 8) return
+        event.preventDefault()
+        const steps = Math.max(1, Math.round(Math.abs(distance) / 24))
+        onChange(wrap(value + (distance > 0 ? steps : -steps)))
+      }}
+      onClick={(event) => {
+        if (!(event.target instanceof Element)) return
+        const offset =
+          event.target.closest<HTMLElement>("[data-offset]")?.dataset.offset
+        if (offset !== undefined) onChange(wrap(value + Number(offset)))
+      }}
+      className="relative flex flex-col items-center text-[clamp(18px,3cqh,25px)] outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      {[-3, -2, -1, 0, 1, 2, 3].map((offset) => (
+        <span
+          key={offset}
+          data-offset={offset}
+          aria-hidden="true"
+          className={`flex h-[clamp(22px,4cqh,32px)] items-center ${
+            offset === 0
+              ? "text-black"
+              : Math.abs(offset) > 1
+                ? "text-[#ddd]"
+                : "text-[#aaa]"
+          }`}
+        >
+          {String(wrap(value + offset)).padStart(2, "0")}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function Prototype() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -372,7 +448,10 @@ function Prototype() {
   const [videoReady, setVideoReady] = useState(false)
   const [videoFailed, setVideoFailed] = useState(false)
   const [playBlocked, setPlayBlocked] = useState(false)
-  const [paused, setPaused] = useState(false)
+  const [scheduled, setScheduled] = useState(() => ({
+    ...PROTOTYPE_CONFIG.schedule,
+    days: [...PROTOTYPE_CONFIG.schedule.days],
+  }))
   const [assets, setAssets] = useState<Asset[]>([])
   const [mediaTab, setMediaTab] = useState("cloud")
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null)
@@ -400,8 +479,6 @@ function Prototype() {
   const landscapeVideoUrl =
     resolveVideoUrl(PROTOTYPE_CONFIG.video.landscapeVideoUrl) || homeVideoUrl
   const videoUrl = wide && isLandscape ? landscapeVideoUrl : homeVideoUrl
-  const driveVideo = isDriveVideoUrl(videoUrl)
-  const scheduled = PROTOTYPE_CONFIG.schedule
   const time = `${String(scheduled.hour).padStart(2, "0")}:${String(scheduled.minute).padStart(2, "0")}`
   const preview =
     scheduled.repeat === "NEVER"
@@ -412,11 +489,13 @@ function Prototype() {
           ? `Unlock every weekday at ${time}`
           : scheduled.repeat === "WEEKENDS"
             ? `Unlock every Sat, Sun at ${time}`
-            : `Unlock every ${scheduled.days
-                .slice()
-                .sort()
-                .map((index) => days[index])
-                .join(", ")} at ${time}`
+            : scheduled.days.length
+              ? `Unlock every ${scheduled.days
+                  .slice()
+                  .sort()
+                  .map((index) => days[index])
+                  .join(", ")} at ${time}`
+              : "Select at least one day for a custom schedule"
   const notify = (text: string) => setNotice({ text, id: Date.now() })
   const go = (destination: string) => {
     if (recording) stopRecording()
@@ -474,7 +553,6 @@ function Prototype() {
     setVideoReady(false)
     setVideoFailed(false)
     setPlayBlocked(false)
-    setPaused(false)
   }, [videoUrl])
   useEffect(() => {
     if (!rotationHint) return
@@ -503,17 +581,20 @@ function Prototype() {
   useEffect(() => {
     if (!scheduled.enabled) return
     let lastRun = ""
+    let hasRun = false
     const timer = setInterval(() => {
       const now = new Date()
       const dateKey = now.toDateString()
       const matchesDay =
-        scheduled.repeat === "DAILY" ||
-        scheduled.repeat === "NEVER" ||
-        (scheduled.repeat === "WEEKDAYS"
-          ? now.getDay() > 0 && now.getDay() < 6
-          : scheduled.repeat === "WEEKENDS"
-            ? [0, 6].includes(now.getDay())
-            : scheduled.days.includes(now.getDay()))
+        scheduled.repeat === "NEVER"
+          ? !hasRun
+          : scheduled.repeat === "DAILY"
+            ? true
+            : scheduled.repeat === "WEEKDAYS"
+              ? now.getDay() > 0 && now.getDay() < 6
+              : scheduled.repeat === "WEEKENDS"
+                ? [0, 6].includes(now.getDay())
+                : scheduled.days.includes(now.getDay())
       if (
         matchesDay &&
         now.getHours() === scheduled.hour &&
@@ -521,6 +602,7 @@ function Prototype() {
         dateKey !== lastRun
       ) {
         lastRun = dateKey
+        if (scheduled.repeat === "NEVER") hasRun = true
         unlock("Device auto-unlocked for delivery")
       }
     }, 1000)
@@ -539,7 +621,6 @@ function Prototype() {
     try {
       await video.play()
       setPlayBlocked(false)
-      setPaused(false)
     } catch {
       setPlayBlocked(true)
     }
@@ -829,12 +910,13 @@ function Prototype() {
               >
                 <video
                   ref={videoRef}
-                  src={!driveVideo && videoUrl ? videoUrl : undefined}
+                  src={videoUrl || undefined}
                   poster={PROTOTYPE_CONFIG.video.posterUrl}
                   preload="auto"
                   autoPlay
                   loop
                   playsInline
+                  controls={false}
                   muted={!speaker}
                   disablePictureInPicture
                   onLoadedMetadata={(event) => {
@@ -845,12 +927,11 @@ function Prototype() {
                   }}
                   onCanPlay={() => {
                     setVideoReady(true)
-                    if (!paused) void startVideo()
+                    void startVideo()
                   }}
                   onPlaying={() => {
                     setVideoReady(true)
                     setPlayBlocked(false)
-                    setPaused(false)
                   }}
                   onTimeUpdate={(event) => {
                     positions.current[videoUrl] =
@@ -866,16 +947,7 @@ function Prototype() {
                     videoReady && !videoFailed ? "opacity-100" : "opacity-0"
                   }`}
                 />
-                {driveVideo && (
-                  <iframe
-                    title="Camera video — Google Drive"
-                    src={videoUrl}
-                    allow="autoplay; fullscreen; encrypted-media"
-                    allowFullScreen
-                    className="absolute inset-0 h-full w-full border-0"
-                  />
-                )}
-                {!driveVideo && (!videoReady || videoFailed) && (
+                {(!videoReady || videoFailed) && (
                   <img
                     src={PROTOTYPE_CONFIG.video.posterUrl}
                     alt="Delivery camera preview"
@@ -897,19 +969,15 @@ function Prototype() {
                 {flash && (
                   <div className="pointer-events-none absolute inset-0 bg-white" />
                 )}
-                {playBlocked && !videoFailed && (
-                  <button
-                    onClick={() => void startVideo()}
-                    className="absolute inset-0 flex items-center justify-center gap-2 bg-black/25 text-white"
-                  >
-                    <Play size={30} fill="currentColor" />
-                    Play camera
-                  </button>
-                )}
                 {videoFailed && (
                   <div className="absolute bottom-2 left-2 right-2 rounded bg-black/75 px-3 py-2 text-center text-xs text-white">
                     Video unavailable. Check the owner-configured URL.
                   </div>
+                )}
+                {playBlocked && !videoFailed && (
+                  <span role="status" className="sr-only">
+                    Autoplay is blocked by browser settings.
+                  </span>
                 )}
               </div>
               <div className="flex min-h-0 items-center justify-between gap-2 px-3">
@@ -921,21 +989,6 @@ function Prototype() {
                   <span className="truncate">9C6WXFJ6+JWC</span>
                 </button>
                 <div className="flex items-center gap-3">
-                  {videoUrl && !driveVideo && !videoFailed && (
-                    <button
-                      aria-label={paused ? "Play video" : "Pause video"}
-                      onClick={() => {
-                        if (paused) void startVideo()
-                        else {
-                          videoRef.current?.pause()
-                          setPaused(true)
-                        }
-                      }}
-                      className="text-white"
-                    >
-                      {paused ? <Play size={22} /> : <Pause size={22} />}
-                    </button>
-                  )}
                   <button
                     aria-label={speaker ? "Mute speaker" : "Unmute speaker"}
                     aria-pressed={speaker}
@@ -1497,35 +1550,27 @@ function Prototype() {
                 {time}
               </div>
               <div
-                aria-label="Configured time"
-                className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+                aria-label="Set unlock time"
+                className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center overflow-hidden"
               >
                 <div className="absolute inset-x-2 top-1/2 h-10 -translate-y-1/2 rounded-full bg-[#f4f4f4]" />
                 <div className="relative flex gap-12">
-                  {[scheduled.hour, scheduled.minute].map((value, column) => (
-                    <div
-                      key={column}
-                      className="flex flex-col items-center text-[clamp(18px,3cqh,25px)]"
-                    >
-                      {[-3, -2, -1, 0, 1, 2, 3].map((offset) => (
-                        <span
-                          key={offset}
-                          className={`flex h-[clamp(22px,4cqh,32px)] items-center ${
-                            offset === 0
-                              ? "text-black"
-                              : Math.abs(offset) > 1
-                                ? "text-[#ddd]"
-                                : "text-[#aaa]"
-                          }`}
-                        >
-                          {String(
-                            (value + offset + (column === 0 ? 24 : 60)) %
-                              (column === 0 ? 24 : 60),
-                          ).padStart(2, "0")}
-                        </span>
-                      ))}
-                    </div>
-                  ))}
+                  <TimeWheel
+                    value={scheduled.hour}
+                    max={24}
+                    label="Unlock hour"
+                    onChange={(hour) =>
+                      setScheduled((current) => ({ ...current, hour }))
+                    }
+                  />
+                  <TimeWheel
+                    value={scheduled.minute}
+                    max={60}
+                    label="Unlock minute"
+                    onChange={(minute) =>
+                      setScheduled((current) => ({ ...current, minute }))
+                    }
+                  />
                 </div>
               </div>
               <section className="shrink-0">
@@ -1533,8 +1578,16 @@ function Prototype() {
                 <div className="flex flex-wrap gap-2">
                   {["NEVER", "DAILY", "WEEKDAYS", "WEEKENDS", "CUSTOM"].map(
                     (value) => (
-                      <span
+                      <button
                         key={value}
+                        type="button"
+                        aria-pressed={scheduled.repeat === value}
+                        onClick={() =>
+                          setScheduled((current) => ({
+                            ...current,
+                            repeat: value as typeof current.repeat,
+                          }))
+                        }
                         className={`rounded-full px-3 py-2 text-[12px] ${
                           scheduled.repeat === value
                             ? "bg-primary text-white"
@@ -1542,16 +1595,35 @@ function Prototype() {
                         }`}
                       >
                         {value}
-                      </span>
+                      </button>
                     ),
                   )}
                 </div>
                 <div className="mt-4 flex justify-between">
                   {days.map((day, index) => (
-                    <span
+                    <button
                       key={day}
+                      type="button"
+                      aria-pressed={
+                        scheduled.repeat === "CUSTOM" &&
+                        scheduled.days.includes(index)
+                      }
+                      onClick={() =>
+                        setScheduled((current) => ({
+                          ...current,
+                          repeat: "CUSTOM",
+                          days: current.days.includes(index)
+                            ? current.days.filter(
+                                (dayIndex) => dayIndex !== index,
+                              )
+                            : [...current.days, index].sort(),
+                        }))
+                      }
                       aria-label={`${day}${
-                        scheduled.days.includes(index) ? ", scheduled" : ""
+                        scheduled.repeat === "CUSTOM" &&
+                        scheduled.days.includes(index)
+                          ? ", scheduled"
+                          : ""
                       }`}
                       className={`flex h-[clamp(34px,10cqw,44px)] w-[clamp(34px,10cqw,44px)] items-center justify-center rounded-full text-[16px] font-semibold ${
                         scheduled.repeat === "CUSTOM" &&
@@ -1561,7 +1633,7 @@ function Prototype() {
                       }`}
                     >
                       {day[0]}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -1576,8 +1648,7 @@ function Prototype() {
                     : "Auto-Unlock disabled"}
                 </p>
                 <p className="mt-1 text-xs">
-                  Managed by the device owner. This schedule cannot be changed
-                  here.
+                  Schedule changes apply immediately in this session.
                 </p>
               </div>
             </main>
@@ -1887,20 +1958,14 @@ function Prototype() {
                 alt="Captured snapshot"
                 className="max-h-[80cqh] max-w-full"
               />
-            ) : isDriveVideoUrl(selectedMedia) ? (
-              <iframe
-                title="Saved video — Google Drive"
-                src={selectedMedia}
-                allow="autoplay; fullscreen; encrypted-media"
-                allowFullScreen
-                className="aspect-video max-h-[80cqh] w-full max-w-[900px] border-0"
-              />
             ) : (
               <video
                 src={selectedMedia}
                 autoPlay
-                controls
+                loop
+                muted
                 playsInline
+                controls={false}
                 preload="auto"
                 className="max-h-[80cqh] w-full max-w-[900px] object-contain"
               />

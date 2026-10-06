@@ -3,10 +3,10 @@ export const PROTOTYPE_CONFIG = {
   video: {
     // Paste the public video URL for the HOME camera frame and PORTRAIT player here.
     // Prefer a direct MP4 URL or a local asset such as "/assets/home-video.mp4".
-    // Public Google Drive /file/d/FILE_ID/view links use Drive's embedded player.
-    // Set sharing to "Anyone with the link". Drive controls playback and buffering.
-    // Direct MP4/local URLs use the native, autoplaying camera player instead.
-    homeVideoUrl: "https://drive.google.com/file/d/1pb-ro8NLyBpWEbsco2c9BVtpfgjkj7La/view?usp=drive_link",
+    // Public Google Drive /file/d/FILE_ID/view links are loaded in the native player.
+    // Set sharing to "Anyone with the link".
+    homeVideoUrl:
+      "https://drive.google.com/file/d/1pb-ro8NLyBpWEbsco2c9BVtpfgjkj7La/view?usp=drive_link",
     // Paste the public LANDSCAPE video URL here. It plays when the phone is tilted.
     // Leave empty to reuse homeVideoUrl without restarting playback on rotation.
     landscapeVideoUrl: "",
@@ -14,7 +14,7 @@ export const PROTOTYPE_CONFIG = {
     // For reliable demos, place both videos in public/assets and use local URLs.
     posterUrl: "/assets/camera-poster.png",
   },
-  // Only the owner changes the schedule here. The Schedule Unlock screen is read-only.
+  // Default schedule for the interactive Schedule Unlock preview.
   schedule: {
     enabled: true,
     hour: 10,
@@ -34,7 +34,7 @@ export function resolveVideoUrl(value: string) {
         url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] ||
         url.searchParams.get("id")
       if (fileId)
-        return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`
+        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`
     }
   } catch {
     return trimmed
