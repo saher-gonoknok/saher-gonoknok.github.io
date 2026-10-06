@@ -1,12 +1,8 @@
 // OWNER CONFIGURATION ONLY. These URLs are not editable by prototype users.
 export const PROTOTYPE_CONFIG = {
   video: {
-    // Paste the public video URL for the HOME camera frame and PORTRAIT player here.
-    // Prefer a direct MP4 URL or a local asset such as "/assets/home-video.mp4".
-    // Public Google Drive /file/d/FILE_ID/view links are loaded in the native player.
-    // Set sharing to "Anyone with the link".
-    homeVideoUrl:
-      "https://drive.google.com/file/d/1pb-ro8NLyBpWEbsco2c9BVtpfgjkj7La/view?usp=drive_link",
+    // Keep the home video local so browser cross-origin policies don't block playback.
+    homeVideoUrl: "/assets/home-video.mp4",
     // Paste the public LANDSCAPE video URL here. It plays when the phone is tilted.
     // Leave empty to reuse homeVideoUrl without restarting playback on rotation.
     landscapeVideoUrl: "",
